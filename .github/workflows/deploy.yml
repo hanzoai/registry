@@ -1,0 +1,32 @@
+name: Deploy Registry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'k8s/**'
+      - 'config.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Configure kubectl
+        run: doctl kubernetes cluster kubeconfig save do-sfo3-hanzo-k8s
+
+      - name: Apply manifests
+        run: kubectl apply -f k8s/
+
+      - name: Restart registry
+        run: kubectl -n hanzo rollout restart deployment registry
+
+      - name: Wait for rollout
+        run: kubectl -n hanzo rollout status deployment registry --timeout=120s

@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: hanzo
+  labels:
+    app: registry
+    app.kubernetes.io/name: registry
+    app.kubernetes.io/part-of: hanzo-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registry
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      containers:
+        - name: registry
+          image: registry:2
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            - name: REGISTRY_AUTH
+              value: token
+            - name: REGISTRY_AUTH_TOKEN_REALM
+              value: https://iam.hanzo.ai/api/registry/token
+            - name: REGISTRY_AUTH_TOKEN_SERVICE
+              value: registry.hanzo.ai
+            - name: REGISTRY_AUTH_TOKEN_ISSUER
+              value: hanzo-iam
+            - name: REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE
+              value: /etc/registry-signing/signing.crt
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+            - name: REGISTRY_HTTP_HEADERS_Access-Control-Allow-Origin
+              value: '[https://registry.hanzo.ai]'
+            - name: REGISTRY_HTTP_HEADERS_Access-Control-Allow-Methods
+              value: '[HEAD, GET, OPTIONS, DELETE]'
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/registry
+            - name: signing-key
+              mountPath: /etc/registry-signing
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: registry-data
+        - name: signing-key
+          secret:
+            secretName: registry-signing-key
+            items:
+              - key: signing.crt
+                path: signing.crt

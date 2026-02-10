@@ -1,0 +1,21 @@
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+    Access-Control-Allow-Origin: ['https://registry.hanzo.ai']
+    Access-Control-Allow-Methods: ['HEAD', 'GET', 'OPTIONS', 'DELETE']
+auth:
+  token:
+    realm: https://iam.hanzo.ai/api/registry/token
+    service: registry.hanzo.ai
+    issuer: hanzo-iam
+    rootcertbundle: /etc/registry-signing/signing.crt
