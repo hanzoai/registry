@@ -4,7 +4,7 @@ Docker container registry with Hanzo IAM token authentication.
 
 ## Overview
 
-Private Docker registry running on hanzo-k8s, authenticated via Hanzo IAM (Casdoor) token-based auth.
+Private Docker registry running on hanzo-k8s, authenticated via Hanzo IAM token-based auth.
 
 - **Image**: `registry:2` (Docker Distribution)
 - **Auth**: Token-based via `https://iam.hanzo.ai/api/registry/token`
