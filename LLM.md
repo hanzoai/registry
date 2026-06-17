@@ -1,4 +1,4 @@
-# registry — AI Assistant Context
+# registry
 
 # Hanzo Registry
 
