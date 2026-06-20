@@ -2,78 +2,84 @@
 
 # Hanzo Registry
 
-Docker container registry with Hanzo IAM token authentication.
+**The** container registry for the Lux / Hanzo / Zoo fleet — self-hosted, on our
+own boxes, S3-backed. One registry, one way to push and pull images. Escapes
+GitHub's GHCR push and Actions-artifact storage quotas.
 
 ## Overview
 
-Private Docker registry running on hanzo-k8s, authenticated via Hanzo IAM token-based auth.
+- **Engine**: Docker Distribution (`registry:2`) on hanzo-k8s
+- **Auth**: Hanzo IAM token (`https://iam.hanzo.ai/api/registry/token`, app `hanzo-registry`)
+- **Storage**: `hanzoai/s3` (S3 driver → `s3.hanzo.svc:9000`, bucket `registry`,
+  path-style). Unlimited, on our own boxes — no PVC ceiling, no GitHub quota.
+- **Hosts (branded, one store)**: like `s3.lux.cloud`, a single backing registry
+  is served under per-brand hosts that all route to the same Service:
+  - `registry.hanzo.ai` — Hanzo images
+  - `registry.lux.network` — Lux images
+  - `registry.zoo.network` — Zoo images
 
-- **Image**: `registry:2` (Docker Distribution)
-- **Auth**: Token-based via `https://iam.hanzo.ai/api/registry/token`
-- **Storage**: 50Gi PVC on DigitalOcean Block Storage
-- **Endpoint**: `registry.hanzo.ai` (proxied through Cloudflare → KrakenD)
+  Images are org-namespaced: `registry.hanzo.ai/<org>/<app>`. Use the host that
+  matches the image's brand (Lux images via `registry.lux.network`, etc.).
 
 ## Usage
 
 ```bash
-# Login (uses Hanzo IAM credentials)
-docker login registry.hanzo.ai
-
-# Push an image
-docker tag myapp:latest registry.hanzo.ai/myapp:latest
-docker push registry.hanzo.ai/myapp:latest
-
-# Pull an image
-docker pull registry.hanzo.ai/myapp:latest
+docker login registry.hanzo.ai            # Hanzo IAM credentials (or KMS robot)
+docker tag  myapp:latest registry.hanzo.ai/hanzo/myapp:latest
+docker push registry.hanzo.ai/hanzo/myapp:latest
+docker pull registry.hanzo.ai/hanzo/myapp:latest
 ```
 
-## Deployment
+In CI this is automatic: a repo's `hanzo.yml` sets `repo: registry.hanzo.ai/<org>/<app>`
+and `hanzoai/ci` logs in with a KMS-provided IAM robot credential. See
+[hanzoai/ci](https://github.com/hanzoai/ci).
+
+## Architecture
+
+```
+docker push registry.hanzo.ai/<org>/<app>
+        │  401 → token realm
+        ▼
+iam.hanzo.ai/api/registry/token   (app hanzo-registry, signed JWT)
+        │  JWT
+        ▼
+registry (Distribution, hanzo-k8s)  ── validates JWT vs SIGNING_CRT
+        │  blob/manifest writes
+        ▼
+hanzoai/s3  (s3.hanzo.svc:9000, bucket `registry`)   ← image layers live here
+```
+
+## Deploy
 
 ```bash
-# Deploy to hanzo-k8s
-make deploy
+# one-time: provision the S3 bucket in hanzoai/s3
+kubectl apply -f k8s/create-bucket-job.yaml
 
-# Check status
-make status
-
-# View logs
-make logs
+# config + deployment (S3 storage via ConfigMap; creds from the s3-credentials secret)
+kubectl apply -f k8s/configmap.yaml -f k8s/deployment.yaml -f k8s/service.yaml
+kubectl -n hanzo rollout status deploy/registry
 ```
 
-## Setup (first time)
-
-1. Generate signing certificate:
-   ```bash
-   make generate-cert
-   ```
-
-2. Create the k8s secret:
-   ```bash
-   make create-secret
-   ```
-
-3. Deploy:
-   ```bash
-   make deploy
-   ```
+`config.yml` is the source of truth and ships as the `registry-config` ConfigMap
+(mounted over the image default — no image rebuild to change storage/auth).
 
 ## Structure
 
 ```
-config.yml              # Registry configuration
-Dockerfile              # Custom registry image (optional)
+config.yml                  # source of truth (S3 storage + IAM token auth)
 k8s/
-  deployment.yaml       # Registry deployment with IAM auth
-  service.yaml          # ClusterIP service on port 5000
-  pvc.yaml              # 50Gi persistent volume claim
-Makefile                # Deploy and manage commands
+  configmap.yaml            # config.yml as a mounted ConfigMap
+  deployment.yaml           # registry:2; S3 creds from the s3-credentials secret
+  service.yaml              # ClusterIP :5000
+  create-bucket-job.yaml    # one-time: mc mb s3/registry
 ```
 
-## Auth Flow
+## Credentials (no secrets in this repo)
 
-1. Docker client attempts to push/pull from `registry.hanzo.ai`
-2. Registry returns 401 with token realm URL
-3. Client requests token from `https://iam.hanzo.ai/api/registry/token`
-4. IAM validates credentials and returns signed JWT
-5. Client retries with JWT in Authorization header
-6. Registry validates JWT signature against `signing.crt`
+- **S3 backend**: `REGISTRY_STORAGE_S3_ACCESSKEY`/`SECRETKEY` from the
+  `s3-credentials` secret (the same canonical s3 root secret the `s3` deploy
+  uses). Non-secret S3 config (endpoint/bucket/path-style) is in `config.yml`.
+- **Token signing**: `registry-signing-key` secret, key `SIGNING_CRT`, mounted
+  at `/etc/registry-signing/signing.crt`.
+- **Push from CI / clients**: an IAM robot for app `hanzo-registry`, distributed
+  via KMS — never checked in.
