@@ -27,7 +27,7 @@ spec:
             - name: REGISTRY_AUTH
               value: token
             - name: REGISTRY_AUTH_TOKEN_REALM
-              value: https://iam.hanzo.ai/api/registry/token
+              value: https://iam.hanzo.ai/v1/iam/registry/token
             - name: REGISTRY_AUTH_TOKEN_SERVICE
               value: registry.hanzo.ai
             - name: REGISTRY_AUTH_TOKEN_ISSUER
