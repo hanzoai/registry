@@ -12,7 +12,7 @@ GHCR push + Actions-artifact storage quotas.
   2026-06-20.)
 - `config.yml` is source of truth, shipped as the `registry-config` ConfigMap
   mounted over the image default → change storage/auth with no image rebuild.
-- Auth = IAM token, realm `https://iam.hanzo.ai/api/registry/token`, issuer
+- Auth = IAM token, realm `https://iam.hanzo.ai/v1/iam/registry/token`, issuer
   `hanzo-iam`, JWT verified against `SIGNING_CRT` (in `registry-signing-key`).
 - Branded hosts (one store, like s3.lux.cloud): `registry.hanzo.ai`,
   `registry.lux.network`, `registry.zoo.network` → same Service. Images
