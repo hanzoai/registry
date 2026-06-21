@@ -7,7 +7,7 @@ GitHub's GHCR push and Actions-artifact storage quotas.
 ## Overview
 
 - **Engine**: Docker Distribution (`registry:2`) on hanzo-k8s
-- **Auth**: Hanzo IAM token (`https://iam.hanzo.ai/api/registry/token`, app `hanzo-registry`)
+- **Auth**: Hanzo IAM token (`https://iam.hanzo.ai/v1/iam/registry/token`, app `hanzo-registry`)
 - **Storage**: `hanzoai/s3` (S3 driver → `s3.hanzo.svc:9000`, bucket `registry`,
   path-style). Unlimited, on our own boxes — no PVC ceiling, no GitHub quota.
 - **Hosts (branded, one store)**: like `s3.lux.cloud`, a single backing registry
@@ -38,7 +38,7 @@ and `hanzoai/ci` logs in with a KMS-provided IAM robot credential. See
 docker push registry.hanzo.ai/<org>/<app>
         │  401 → token realm
         ▼
-iam.hanzo.ai/api/registry/token   (app hanzo-registry, signed JWT)
+iam.hanzo.ai/v1/iam/registry/token   (app hanzo-registry, signed JWT)
         │  JWT
         ▼
 registry (Distribution, hanzo-k8s)  ── validates JWT vs SIGNING_CRT
