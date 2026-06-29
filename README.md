@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="registry" width="880"></p>
+
 # Hanzo Registry
 
 Docker container registry with Hanzo IAM token authentication.
