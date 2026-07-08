@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-config
+  namespace: hanzo
+  labels:
+    app: registry
+    app.kubernetes.io/part-of: hanzo-platform
+data:
+  # Mirrors ../config.yml. S3-backed (hanzoai/s3); accesskey/secretkey come from
+  # the hanzo-s3 secret at runtime via REGISTRY_STORAGE_S3_* env, not from here.
+  config.yml: |
+    version: 0.1
+    log:
+      fields:
+        service: registry
+    storage:
+      s3:
+        regionendpoint: http://s3.hanzo.svc:9000
+        region: us-east-1
+        bucket: registry
+        secure: false
+        forcepathstyle: true
+        rootdirectory: /
+      delete:
+        enabled: true
+    http:
+      addr: :5000
+      headers:
+        X-Content-Type-Options: [nosniff]
+        Access-Control-Allow-Origin: ['https://registry.hanzo.ai']
+        Access-Control-Allow-Methods: ['HEAD', 'GET', 'OPTIONS', 'DELETE']
+    auth:
+      token:
+        realm: https://iam.hanzo.ai/v1/iam/registry/token
+        service: registry.hanzo.ai
+        issuer: hanzo-iam
+        rootcertbundle: /etc/registry-signing/signing.crt

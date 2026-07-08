@@ -3,8 +3,17 @@ log:
   fields:
     service: registry
 storage:
-  filesystem:
-    rootdirectory: /var/lib/registry
+  # S3-backed (hanzoai/s3) — unlimited, on our own boxes, no PVC ceiling and no
+  # GitHub/GHCR storage quota. accesskey/secretkey are injected at runtime from
+  # the `hanzo-s3` secret via REGISTRY_STORAGE_S3_ACCESSKEY/SECRETKEY env, so no
+  # credentials live in this file or the ConfigMap.
+  s3:
+    regionendpoint: http://s3.hanzo.svc:9000
+    region: us-east-1
+    bucket: registry
+    secure: false
+    forcepathstyle: true
+    rootdirectory: /
   delete:
     enabled: true
 http:
@@ -15,7 +24,7 @@ http:
     Access-Control-Allow-Methods: ['HEAD', 'GET', 'OPTIONS', 'DELETE']
 auth:
   token:
-    realm: https://iam.hanzo.ai/api/registry/token
+    realm: https://iam.hanzo.ai/v1/iam/registry/token
     service: registry.hanzo.ai
     issuer: hanzo-iam
     rootcertbundle: /etc/registry-signing/signing.crt

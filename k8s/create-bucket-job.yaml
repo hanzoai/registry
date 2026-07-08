@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: registry-create-bucket
+  namespace: hanzo
+spec:
+  ttlSecondsAfterFinished: 120
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mc
+          image: minio/mc
+          env:
+            - name: ACCESS
+              valueFrom:
+                secretKeyRef: { name: s3-credentials, key: access-key }
+            - name: SECRET
+              valueFrom:
+                secretKeyRef: { name: s3-credentials, key: secret-key }
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              mc alias set s3 http://s3.hanzo.svc:9000 "$ACCESS" "$SECRET"
+              mc mb --ignore-existing s3/registry
+              mc ls s3/ && echo "bucket registry ready"
