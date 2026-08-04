@@ -6,19 +6,22 @@ NAMESPACE ?= hanzo
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# This repo ships an IMAGE and no code, so the honest local build is no build at
-# all: CI builds ./Dockerfile for every architecture we publish, and a docker
-# build run here would produce a one-arch artifact nothing deploys.
-build: ## Nothing to build locally — CI builds the image from ./Dockerfile.
-	@echo "registry ships an image. CI builds it from ./Dockerfile; there is nothing to build here."
+# There is no code here, and nothing builds ./Dockerfile either — not locally and
+# not in CI. .github/workflows/deploy.yml only applies k8s/ and restarts the
+# rollout, and k8s/deployment.yaml runs upstream `registry:2` configured entirely
+# by REGISTRY_* env. So neither the Dockerfile nor the config.yml it COPYs reaches
+# a running pod. Worth knowing before you edit either one expecting a deploy to
+# pick it up.
+build: ## Nothing to build — no code here, and nothing builds ./Dockerfile.
+	@echo "no code here. CI only applies k8s/, and the pod runs upstream registry:2 configured by REGISTRY_* env, so ./Dockerfile is built by nothing."
 
 # The whole repo is YAML — a registry config and three manifests — so "does it
 # parse" is the only check there is to run, and it is both the test and the lint.
 # Stated once here; test is the alias. python3 because it is already on every box
 # this runs on, where yq and kubectl are not.
-lint: ## Parse every YAML this repo ships (config.yml + k8s/).
-	python3 -c 'import sys,yaml;[list(yaml.safe_load_all(open(f))) for f in sys.argv[1:]]' config.yml k8s/*.yaml
-	@echo ">> parsed: config.yml k8s/*.yaml"
+lint: ## Parse every YAML this repo ships (config.yml, k8s/, the workflow).
+	python3 -c 'import sys,yaml;[list(yaml.safe_load_all(open(f))) for f in sys.argv[1:]]' config.yml k8s/*.yaml .github/workflows/deploy.yml
+	@echo ">> parsed: config.yml k8s/*.yaml .github/workflows/deploy.yml"
 
 test: lint ## Alias for lint.
 
