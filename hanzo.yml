@@ -1,19 +1,32 @@
 # Canonical CI/CD config for hanzoai/registry — read by the hanzoai/ci reusable
 # (.hanzo/workflows/cicd.yml) and by platform.hanzo.ai.
 #
-# The fleet's self-hosted, S3-backed container registry (registry.hanzo.ai).
-# The repo IS the image: a pinned distribution base plus config.yml (token auth
-# against iam.hanzo.ai, the storage driver, the CORS allowlist). So the
-# Dockerfile is the gate — it goes red if the pinned base stops resolving or
-# config.yml is missing from the context, and there is no source here for a
-# `test:` block to compile.
+# What this repo actually ships is k8s/, not an image. k8s/deployment.yaml runs
+# UPSTREAM `registry:2` and configures the whole thing through env
+# (REGISTRY_AUTH_TOKEN_REALM -> iam.hanzo.ai, storage, the CORS allowlist);
+# nothing in this repo, in universe, or in the Makefile ever pulls
+# ghcr.io/hanzoai/registry. So the Dockerfile beside those manifests builds an
+# artifact with no consumer, and declaring `images:` here would publish a
+# version series for it on every push — a tag a human could pin, standing for
+# something we do not run. Left unbuilt on purpose.
 #
-# No `deploy:` — this repo is rolled by its own .hanzo/workflows/deploy.yml
-# (kubectl apply -f k8s/ + rollout restart), not by an operator Service CR, and
-# a deploy stanza pointing at a CR that does not exist would be a lie.
+# The failure this repo really has is a manifest that does not apply: `make
+# deploy` and .hanzo/workflows/deploy.yml both end in `kubectl apply -f k8s/`,
+# so a bad field there is found in production or not at all. kubeconform checks
+# every manifest against the Kubernetes API schema offline — no cluster, no
+# credentials — and -strict also rejects fields the schema does not define,
+# which is how a silently-ignored typo gets caught. Proven red against a
+# one-character break (replicas: "one" -> exit 1).
+#
+# No `deploy:` — the rollout is deploy.yml's, and there is no operator Service
+# CR for this workload to name.
 
-images:
-  - name: registry
-    context: .
-    dockerfile: Dockerfile
-    repo: ghcr.io/hanzoai/registry
+test:
+  - name: manifests validate against the Kubernetes schema
+    run: |
+      set -euo pipefail
+      export PATH="$HOME/.local/bin:$PATH"; mkdir -p "$HOME/.local/bin"
+      command -v kubeconform >/dev/null 2>&1 || curl -fsSL \
+        https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+        | tar -xz -C "$HOME/.local/bin" kubeconform
+      kubeconform -strict -summary k8s/
