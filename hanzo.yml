@@ -1,0 +1,19 @@
+# Canonical CI/CD config for hanzoai/registry — read by the hanzoai/ci reusable
+# (.hanzo/workflows/cicd.yml) and by platform.hanzo.ai.
+#
+# The fleet's self-hosted, S3-backed container registry (registry.hanzo.ai).
+# The repo IS the image: a pinned distribution base plus config.yml (token auth
+# against iam.hanzo.ai, the storage driver, the CORS allowlist). So the
+# Dockerfile is the gate — it goes red if the pinned base stops resolving or
+# config.yml is missing from the context, and there is no source here for a
+# `test:` block to compile.
+#
+# No `deploy:` — this repo is rolled by its own .hanzo/workflows/deploy.yml
+# (kubectl apply -f k8s/ + rollout restart), not by an operator Service CR, and
+# a deploy stanza pointing at a CR that does not exist would be a lie.
+
+images:
+  - name: registry
+    context: .
+    dockerfile: Dockerfile
+    repo: ghcr.io/hanzoai/registry
