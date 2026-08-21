@@ -4,37 +4,35 @@ Docker container registry with Hanzo IAM token authentication.
 
 ## Overview
 
-Private Docker registry running on hanzo-k8s, authenticated via Hanzo IAM token-based auth.
+The fleet OCI registry on hanzo-k8s, authenticated with Hanzo IAM tokens.
 
+- **Endpoint**: `oci.hanzo.ai`
 - **Image**: `registry:2` (Docker Distribution)
-- **Auth**: Token-based via `https://iam.hanzo.ai/api/registry/token`
-- **Storage**: 50Gi PVC on DigitalOcean Block Storage
-- **Endpoint**: `registry.hanzo.ai` (proxied through Cloudflare → KrakenD)
+- **Auth**: token realm `https://hanzo.id/v1/iam/registry/token`, service `oci.hanzo.ai`
+- **Storage**: `hanzoai/s3` at `s3.hanzo.svc:9000`, bucket `registry`
 
-## Usage
+Repositories are org-namespaced — `oci.hanzo.ai/<org>/<app>`, never a bare name.
 
 ```bash
 # Login (uses Hanzo IAM credentials)
-docker login registry.hanzo.ai
+docker login oci.hanzo.ai
 
 # Push an image
-docker tag myapp:latest registry.hanzo.ai/myapp:latest
-docker push registry.hanzo.ai/myapp:latest
+docker tag myapp:latest oci.hanzo.ai/hanzoai/myapp:latest
+docker push oci.hanzo.ai/hanzoai/myapp:latest
 
 # Pull an image
-docker pull registry.hanzo.ai/myapp:latest
+docker pull oci.hanzo.ai/hanzoai/myapp:latest
 ```
 
 ## Deployment
 
+`.hanzo/workflows/deploy.yml` applies `k8s/` and rolls the Deployment on a push
+to `main` touching `k8s/**`. `make deploy` runs the same two kubectl commands.
+
 ```bash
-# Deploy to hanzo-k8s
-make deploy
-
-# Check status
+make deploy    # kubectl apply -f k8s/ + rollout restart
 make status
-
-# View logs
 make logs
 ```
 
@@ -50,28 +48,20 @@ make logs
    make create-secret
    ```
 
-3. Deploy:
-   ```bash
-   make deploy
-   ```
-
 ## Structure
 
 ```
-config.yml              # Registry configuration
-Dockerfile              # Custom registry image (optional)
-k8s/
-  deployment.yaml       # Registry deployment with IAM auth
-  service.yaml          # ClusterIP service on port 5000
-  pvc.yaml              # 50Gi persistent volume claim
-Makefile                # Deploy and manage commands
+k8s/                    # Deployment, Service, PVC — applied by .hanzo/workflows/deploy.yml
+hanzo.yml               # CI: kubeconform -strict over k8s/
+Makefile                # Deploy, read the live workload, write token signing material
+LLM.md                  # Deep notes: routing, auth exchange, where each fact lives
 ```
 
 ## Auth Flow
 
-1. Docker client attempts to push/pull from `registry.hanzo.ai`
-2. Registry returns 401 with token realm URL
-3. Client requests token from `https://iam.hanzo.ai/api/registry/token`
+1. Docker client attempts to push/pull from `oci.hanzo.ai`
+2. Registry returns 401 with the token realm in `WWW-Authenticate`
+3. Client requests token from `https://hanzo.id/v1/iam/registry/token`
 4. IAM validates credentials and returns signed JWT
 5. Client retries with JWT in Authorization header
 6. Registry validates JWT signature against `signing.crt`
