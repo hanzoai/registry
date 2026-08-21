@@ -1,4 +1,4 @@
-.PHONY: help build test lint clean deploy status logs
+.PHONY: help build test lint clean status logs restart generate-cert create-secret
 
 CONTEXT ?= do-sfo3-hanzo-k8s
 NAMESPACE ?= hanzo
@@ -6,13 +6,11 @@ NAMESPACE ?= hanzo
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# The registry is upstream `registry:2`, configured entirely through REGISTRY_*
-# env in k8s/deployment.yaml — so this repo publishes no image, and hanzo.yml
-# declares no `images:`. ./Dockerfile and the config.yml it COPYs are built by
-# nothing and reach no pod; the live config is the `registry-config` ConfigMap
-# in universe. Edit either one and no deploy picks it up.
+# The registry is upstream `registry:2`, configured through REGISTRY_* env in
+# hanzoai/universe — so this repo publishes no image and hanzo.yml declares no
+# `images:`.
 build: ## Nothing to build — the registry is upstream registry:2.
-	@echo "nothing to build. the pod runs upstream registry:2, configured by REGISTRY_* env; ./Dockerfile has no consumer."
+	@echo "nothing to build. the pod runs upstream registry:2, configured by REGISTRY_* env in universe."
 
 # The whole repo is YAML, so "does it parse" is the only check there is to run,
 # and it is both the test and the lint. Stated once here; test is the alias.
@@ -42,19 +40,17 @@ test: lint ## Alias for lint.
 clean: ## Nothing to remove — this repo generates no build artifacts.
 	@echo "nothing to clean. generate-cert writes signing.key/signing.crt — key material, delete those by hand if you mean to."
 
-deploy: ## Deploy registry to k8s
-	kubectl --context $(CONTEXT) apply -f k8s/
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) rollout restart deployment registry
-
+# Read and roll the live workload. None of these DECLARE it: the Deployment is
+# charts/app/values/hanzo/registry.yaml in universe, applied by Hanzo CD, which
+# reconciles the same spec after a restart.
 status: ## Show registry status
 	kubectl --context $(CONTEXT) -n $(NAMESPACE) get deployment registry
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) get pods -l app=registry
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) get pvc registry-data
+	kubectl --context $(CONTEXT) -n $(NAMESPACE) get pods -l app.kubernetes.io/name=registry
 
 logs: ## Tail registry logs
-	kubectl --context $(CONTEXT) -n $(NAMESPACE) logs -l app=registry -f --tail=50
+	kubectl --context $(CONTEXT) -n $(NAMESPACE) logs -l app.kubernetes.io/name=registry -f --tail=50
 
-restart: ## Restart registry pods
+restart: ## Roll the registry pods
 	kubectl --context $(CONTEXT) -n $(NAMESPACE) rollout restart deployment registry
 
 generate-cert: ## Generate a self-signed signing certificate for token auth

@@ -1,7 +1,0 @@
-.git
-*.md
-LICENSE
-.vscode/
-.idea/
-.env*
-docs/
