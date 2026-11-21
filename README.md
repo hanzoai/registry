@@ -1,5 +1,7 @@
 # Hanzo Registry
 
+[![Open in Hanzo](https://hanzo.app/badges/open-in-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/registry&ref=main&action=open) [![Edit with Hanzo](https://hanzo.app/badges/edit-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/registry&ref=main&action=edit) [![Deploy with Hanzo](https://hanzo.app/badges/deploy-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/registry&ref=main&action=deploy)
+
 The fleet OCI registry on hanzo-k8s, authenticated with Hanzo IAM tokens.
 
 - **Endpoint**: `oci.hanzo.ai` — container images and Helm charts
